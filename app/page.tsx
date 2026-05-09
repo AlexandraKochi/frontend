@@ -12,9 +12,9 @@ export default function Home() {
   const { wallets: solanaWallets } = useSolanaWallets();
   const { signAndSendTransaction } = useSignAndSendTransaction();
   const [mensaje, setMensaje] = useState('');
-  const [chat, setChat] = useState<{soyYo: boolean, texto: string, audio?: string, isPremium?: boolean, txHash?: string}[]>([]);
+  const [chat, setChat] = useState<{ soyYo: boolean, texto: string, audio?: string, isPremium?: boolean, txHash?: string }[]>([]);
   const [isTyping, setIsTyping] = useState(false);
-  
+
   // Modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [pendingCost, setPendingCost] = useState('0.005');
@@ -33,7 +33,7 @@ export default function Home() {
   const enviarAlBack = async (signature: any = null, overrideQuery?: string) => {
     const queryToSend = overrideQuery || mensaje;
     if (!queryToSend && !signature) return;
-    
+
     if (!signature) {
       setChat(prev => [...prev, { soyYo: true, texto: queryToSend }]);
       setMensaje('');
@@ -42,15 +42,15 @@ export default function Home() {
     setIsTyping(true);
 
     try {
-      const res = await axios.post('http://localhost:8080/api/agent/ask', {
+      const res = await axios.post('https://back-1qk9.onrender.com/api/agent/ask', {
         query: queryToSend,
         signature: signature
       });
 
       // Si el back responde 200 OK
-      setChat(prev => [...prev, { 
-        soyYo: false, 
-        texto: res.data.answer, 
+      setChat(prev => [...prev, {
+        soyYo: false,
+        texto: res.data.answer,
         audio: res.data.audioUrl,
         isPremium: !!res.data.audioUrl,
         txHash: signature ? "Solana_Tx_" + Math.random().toString(36).substring(7) : undefined
@@ -64,8 +64,8 @@ export default function Home() {
         setPendingQuery(queryToSend);
         setShowPaymentModal(true);
       } else {
-        setChat(prev => [...prev, { 
-          soyYo: false, 
+        setChat(prev => [...prev, {
+          soyYo: false,
           texto: error.response?.data?.answer || "Error de conexión con el agente. Intenta de nuevo."
         }]);
       }
@@ -75,14 +75,14 @@ export default function Home() {
   const handleApprovePayment = async () => {
     // Buscar específicamente Phantom o cualquier wallet cuya dirección NO empiece con 0x (Ethereum)
     const solanaWallet = solanaWallets.find((w) => w.walletClientType === 'phantom') || solanaWallets.find((w) => !w.address.startsWith('0x'));
-    
+
     if (!solanaWallet) {
       alert("No se encontró una wallet de Solana conectada. Cierra sesión y entra usando Phantom.");
       return;
     }
 
     setIsProcessingPayment(true);
-    
+
     try {
       const connection = new Connection("https://api.devnet.solana.com", "confirmed");
 
@@ -92,7 +92,7 @@ export default function Home() {
       const costLamports = parseFloat(pendingCost) * LAMPORTS_PER_SOL;
 
       const transaction = new Transaction();
-      
+
       // NOTA: Para demostrar la transacción de escritura en la Hackathon,
       // realizamos transferencias directas simulando la distribución de fondos de tu Vault. 
       // Si tienes el IDL, idealmente reemplazarías esto por la llamada a tu instrucción Anchor:
@@ -104,7 +104,7 @@ export default function Home() {
           lamports: Math.floor(costLamports * 0.975), // 97.5% al Vault
         })
       );
-      
+
       transaction.add(
         SystemProgram.transfer({
           fromPubkey: userPubKey,
@@ -123,12 +123,12 @@ export default function Home() {
         transaction: transaction.serialize({ requireAllSignatures: false }),
         wallet: solanaWallet as any
       });
-      
+
       // Dependiendo de la versión de Privy, la firma puede venir como string o Uint8Array
-      const txHash = typeof txObj.signature === 'string' 
-        ? txObj.signature 
+      const txHash = typeof txObj.signature === 'string'
+        ? txObj.signature
         : bs58.encode(txObj.signature);
-      
+
       await connection.confirmTransaction(txHash, "confirmed");
 
       setIsProcessingPayment(false);
@@ -136,7 +136,7 @@ export default function Home() {
 
       enviarAlBack(txHash, pendingQuery);
       setPendingQuery('');
-      
+
     } catch (error: any) {
       console.error("Error al procesar pago en Solana:", error);
       setIsProcessingPayment(false);
@@ -151,22 +151,22 @@ export default function Home() {
         {/* Abstract Background Effects */}
         <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-purple-600/20 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-[#14F195]/10 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
-        
+
         <div className="z-10 bg-glass p-10 rounded-3xl border border-white/10 flex flex-col items-center max-w-md w-full mx-4 shadow-2xl glow-effect text-center">
           <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-[#14F195] rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-purple-500/30">
             <Cpu className="text-white w-10 h-10" />
           </div>
           <h1 className="text-4xl font-extrabold mb-2 text-white tracking-tight">Agent<span className="text-gradient">Pay</span></h1>
           <p className="text-gray-400 mb-8 font-medium">Pasarela financiera IA x402 en Solana.</p>
-          
-          <button 
-            onClick={login} 
+
+          <button
+            onClick={login}
             className="w-full bg-white text-black hover:bg-gray-100 py-4 px-6 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-3 transform hover:scale-[1.02] active:scale-95"
           >
             <Wallet className="w-5 h-5" />
             Conectar Wallet
           </button>
-          
+
           <div className="mt-8 flex items-center justify-center gap-2 text-xs text-gray-500">
             <Lock className="w-3 h-3" />
             <span>Autenticación segura via Privy</span>
@@ -193,7 +193,7 @@ export default function Home() {
             </p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-lg border border-white/5">
             <Wallet className="w-4 h-4 text-gray-400" />
@@ -201,8 +201,8 @@ export default function Home() {
               {user?.wallet?.address?.slice(0, 4)}...{user?.wallet?.address?.slice(-4)}
             </span>
           </div>
-          <button 
-            onClick={logout} 
+          <button
+            onClick={logout}
             className="text-gray-400 hover:text-red-400 transition-colors p-2 bg-black/40 rounded-lg border border-white/5"
             title="Desconectar"
           >
@@ -212,7 +212,7 @@ export default function Home() {
       </header>
 
       {/* CHAT AREA */}
-      <div 
+      <div
         ref={chatContainerRef}
         className="flex-1 overflow-y-auto px-4 pb-4 space-y-6 scroll-smooth z-0"
       >
@@ -225,7 +225,7 @@ export default function Home() {
 
         {chat.map((c, i) => (
           <div key={i} className={`flex ${c.soyYo ? 'justify-end' : 'justify-start'} w-full`}>
-            
+
             {!c.soyYo && (
               <div className="w-8 h-8 rounded-full bg-purple-600/20 flex items-center justify-center mr-3 mt-1 shrink-0 border border-purple-500/30">
                 <Cpu className="w-4 h-4 text-purple-400" />
@@ -233,35 +233,34 @@ export default function Home() {
             )}
 
             <div className={`flex flex-col max-w-[85%] md:max-w-[75%] ${c.soyYo ? 'items-end' : 'items-start'}`}>
-              
-              <div className={`p-4 rounded-2xl ${
-                c.soyYo 
-                  ? 'bg-white text-black rounded-tr-sm' 
-                  : c.isPremium 
-                    ? 'bg-gradient-to-br from-[#1e1e2e] to-[#2a2a3c] border border-purple-500/30 rounded-tl-sm text-gray-100 shadow-lg shadow-purple-900/20' 
+
+              <div className={`p-4 rounded-2xl ${c.soyYo
+                  ? 'bg-white text-black rounded-tr-sm'
+                  : c.isPremium
+                    ? 'bg-gradient-to-br from-[#1e1e2e] to-[#2a2a3c] border border-purple-500/30 rounded-tl-sm text-gray-100 shadow-lg shadow-purple-900/20'
                     : 'bg-[#18181b] border border-white/5 rounded-tl-sm text-gray-200'
-              }`}>
+                }`}>
                 {/* Badge de Premium */}
                 {c.isPremium && (
-                   <div className="flex items-center gap-1.5 mb-3 border-b border-white/10 pb-2">
-                     <CheckCircle2 className="w-4 h-4 text-[#14F195]" />
-                     <span className="text-[10px] font-bold tracking-wider text-[#14F195] uppercase">Premium Audio Generado</span>
-                   </div>
+                  <div className="flex items-center gap-1.5 mb-3 border-b border-white/10 pb-2">
+                    <CheckCircle2 className="w-4 h-4 text-[#14F195]" />
+                    <span className="text-[10px] font-bold tracking-wider text-[#14F195] uppercase">Premium Audio Generado</span>
+                  </div>
                 )}
-                
+
                 <p className="text-[15px] leading-relaxed">{c.texto}</p>
-                
+
                 {/* Audio Player Estilizado */}
                 {c.audio && (
                   <div className="mt-4 bg-black/40 rounded-xl p-3 border border-white/5 flex items-center gap-3">
-                     <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center shrink-0">
-                       <Play className="w-4 h-4 text-white ml-0.5" />
-                     </div>
-                     <audio src={c.audio} controls className="w-full h-8 opacity-80" />
+                    <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center shrink-0">
+                      <Play className="w-4 h-4 text-white ml-0.5" />
+                    </div>
+                    <audio src={c.audio} controls className="w-full h-8 opacity-80" />
                   </div>
                 )}
               </div>
-              
+
               {/* On-Chain Record Link */}
               {c.txHash && (
                 <div className="mt-1.5 flex items-center gap-1 px-1">
@@ -299,7 +298,7 @@ export default function Home() {
       {/* INPUT AREA */}
       <div className="p-4 pt-2 bg-[#09090b] z-10 shrink-0">
         <div className="relative flex items-center max-w-4xl mx-auto">
-          <input 
+          <input
             className="w-full bg-[#18181b] px-6 py-4 rounded-2xl border border-white/10 text-white placeholder-gray-500 outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all shadow-lg text-[15px]"
             value={mensaje}
             onChange={(e) => setMensaje(e.target.value)}
@@ -307,8 +306,8 @@ export default function Home() {
             onKeyDown={(e) => e.key === 'Enter' && enviarAlBack()}
             disabled={isTyping || isProcessingPayment}
           />
-          <button 
-            onClick={() => enviarAlBack()} 
+          <button
+            onClick={() => enviarAlBack()}
             disabled={!mensaje.trim() || isTyping || isProcessingPayment}
             className="absolute right-2 bg-white text-black hover:bg-gray-200 disabled:bg-gray-800 disabled:text-gray-500 p-2.5 rounded-xl transition-colors"
           >
@@ -325,19 +324,19 @@ export default function Home() {
       {showPaymentModal && (
         <div className="absolute inset-0 z-50 flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !isProcessingPayment && setShowPaymentModal(false)}></div>
-          
+
           <div className="relative bg-glass border border-white/10 rounded-3xl p-8 max-w-sm w-full shadow-2xl flex flex-col items-center transform transition-all">
             <div className="w-16 h-16 rounded-full bg-[#14F195]/20 flex items-center justify-center mb-4 border border-[#14F195]/30">
               <AlertCircle className="w-8 h-8 text-[#14F195]" />
             </div>
-            
+
             <h3 className="text-[#14F195] font-bold tracking-widest text-[11px] mb-2 uppercase">Servicio Premium x402</h3>
             <h2 className="text-2xl font-bold text-white mb-1 text-center">Firma Requerida</h2>
-            
+
             <div className="w-full bg-black/50 rounded-xl p-4 my-6 border border-white/5">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-gray-400 text-sm">Proveedor</span>
-                <span className="text-white text-sm font-medium flex items-center gap-1"><Cpu className="w-3 h-3 text-purple-400"/> ElevenLabs</span>
+                <span className="text-white text-sm font-medium flex items-center gap-1"><Cpu className="w-3 h-3 text-purple-400" /> ElevenLabs</span>
               </div>
               <div className="flex justify-between items-center pt-2 border-t border-white/5">
                 <span className="text-gray-400 text-sm">Costo</span>
@@ -348,24 +347,23 @@ export default function Home() {
             <button
               onClick={handleApprovePayment}
               disabled={isProcessingPayment}
-              className={`w-full py-4 rounded-xl font-bold text-black flex items-center justify-center gap-2 transition-all ${
-                isProcessingPayment 
-                  ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
+              className={`w-full py-4 rounded-xl font-bold text-black flex items-center justify-center gap-2 transition-all ${isProcessingPayment
+                  ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
                   : 'bg-[#14F195] hover:bg-[#10c87b] hover:shadow-[0_0_15px_rgba(20,241,149,0.4)]'
-              }`}
+                }`}
             >
               {isProcessingPayment ? (
-                 <>
-                   <span className="w-4 h-4 border-2 border-gray-800 border-t-transparent rounded-full animate-spin"></span>
-                   Procesando en Solana...
-                 </>
+                <>
+                  <span className="w-4 h-4 border-2 border-gray-800 border-t-transparent rounded-full animate-spin"></span>
+                  Procesando en Solana...
+                </>
               ) : (
-                 <>Aprobar y Pagar</>
+                <>Aprobar y Pagar</>
               )}
             </button>
-            
+
             {!isProcessingPayment && (
-              <button 
+              <button
                 onClick={() => setShowPaymentModal(false)}
                 className="mt-4 text-gray-400 hover:text-white text-sm transition-colors"
               >
@@ -375,7 +373,7 @@ export default function Home() {
           </div>
         </div>
       )}
-      
+
     </main>
   );
 }
