@@ -1,11 +1,16 @@
 "use client";
 import { useState, useRef, useEffect } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
+import { useSignAndSendTransaction, useWallets as useSolanaWallets } from '@privy-io/react-auth/solana';
+import bs58 from 'bs58';
+import { Connection, PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import axios from 'axios';
 import { Send, User, Wallet, LogOut, Sparkles, Lock, Play, Cpu, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function Home() {
   const { login, authenticated, user, logout } = usePrivy();
+  const { wallets: solanaWallets } = useSolanaWallets();
+  const { signAndSendTransaction } = useSignAndSendTransaction();
   const [mensaje, setMensaje] = useState('');
   const [chat, setChat] = useState<{soyYo: boolean, texto: string, audio?: string, isPremium?: boolean, txHash?: string}[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -61,22 +66,82 @@ export default function Home() {
       } else {
         setChat(prev => [...prev, { 
           soyYo: false, 
-          texto: "Error de conexión con el agente. Intenta de nuevo."
+          texto: error.response?.data?.answer || "Error de conexión con el agente. Intenta de nuevo."
         }]);
       }
     }
   };
 
-  const handleApprovePayment = () => {
+  const handleApprovePayment = async () => {
+    // Buscar específicamente Phantom o cualquier wallet cuya dirección NO empiece con 0x (Ethereum)
+    const solanaWallet = solanaWallets.find((w) => w.walletClientType === 'phantom') || solanaWallets.find((w) => !w.address.startsWith('0x'));
+    
+    if (!solanaWallet) {
+      alert("No se encontró una wallet de Solana conectada. Cierra sesión y entra usando Phantom.");
+      return;
+    }
+
     setIsProcessingPayment(true);
-    // Simulamos la llamada al Smart Contract a través de Privy/Solana
-    setTimeout(() => {
+    
+    try {
+      const connection = new Connection("https://api.devnet.solana.com", "confirmed");
+
+      const vaultPda = new PublicKey("DwkkmbrWr1z35JVxtLHH45rAyMVLyvML5jEcRnpnEAtd");
+      const treasury = new PublicKey("3L1urNptpkyVEhWXuu7rzsgZHkGrkXW6YxBa7nozbMnB");
+      const userPubKey = new PublicKey(solanaWallet.address);
+      const costLamports = parseFloat(pendingCost) * LAMPORTS_PER_SOL;
+
+      const transaction = new Transaction();
+      
+      // NOTA: Para demostrar la transacción de escritura en la Hackathon,
+      // realizamos transferencias directas simulando la distribución de fondos de tu Vault. 
+      // Si tienes el IDL, idealmente reemplazarías esto por la llamada a tu instrucción Anchor:
+      // program.methods.payForService().accounts({...}).instruction()
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: userPubKey,
+          toPubkey: vaultPda,
+          lamports: Math.floor(costLamports * 0.975), // 97.5% al Vault
+        })
+      );
+      
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: userPubKey,
+          toPubkey: treasury,
+          lamports: Math.floor(costLamports * 0.025), // 2.5% fee
+        })
+      );
+
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = userPubKey;
+
+      // Usamos el hook de Privy para firmar y enviar la transacción
+      // Es necesario serializar la transacción a Uint8Array
+      const txObj = await signAndSendTransaction({
+        transaction: transaction.serialize({ requireAllSignatures: false }),
+        wallet: solanaWallet as any
+      });
+      
+      // Dependiendo de la versión de Privy, la firma puede venir como string o Uint8Array
+      const txHash = typeof txObj.signature === 'string' 
+        ? txObj.signature 
+        : bs58.encode(txObj.signature);
+      
+      await connection.confirmTransaction(txHash, "confirmed");
+
       setIsProcessingPayment(false);
       setShowPaymentModal(false);
-      // Reintentar con firma
-      enviarAlBack("SIM_TX_VALIDA_123", pendingQuery);
+
+      enviarAlBack(txHash, pendingQuery);
       setPendingQuery('');
-    }, 2500);
+      
+    } catch (error: any) {
+      console.error("Error al procesar pago en Solana:", error);
+      setIsProcessingPayment(false);
+      alert(`Error al procesar el pago: ${error?.message || "Revisa si tienes SOL en Devnet y asegúrate de que tu Phantom esté en DEVNET, no en Testnet."}`);
+    }
   };
 
   // --- SCREEN 1: LOGIN (Landing Page) ---
