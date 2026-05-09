@@ -42,7 +42,8 @@ export default function Home() {
     setIsTyping(true);
 
     try {
-      const res = await axios.post('https://back-1qk9.onrender.com/api/agent/ask', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const res = await axios.post(`${apiUrl}/api/agent/ask`, {
         query: queryToSend,
         signature: signature
       });
@@ -74,7 +75,7 @@ export default function Home() {
 
   const handleApprovePayment = async () => {
     // Buscar específicamente Phantom o cualquier wallet cuya dirección NO empiece con 0x (Ethereum)
-    const solanaWallet = solanaWallets.find((w) => w.walletClientType === 'phantom') || solanaWallets.find((w) => !w.address.startsWith('0x'));
+    const solanaWallet = solanaWallets.find((w: any) => w.walletClientType === 'phantom' || w.walletName === 'Phantom') || solanaWallets.find((w) => !w.address.startsWith('0x'));
 
     if (!solanaWallet) {
       alert("No se encontró una wallet de Solana conectada. Cierra sesión y entra usando Phantom.");

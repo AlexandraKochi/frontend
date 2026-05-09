@@ -20,7 +20,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           },
         },
         embeddedWallets: {
-          createOnLogin: 'users-without-wallets',
+          solana: {
+            createOnLogin: 'users-without-wallets',
+          }
         },
       }}
     >
